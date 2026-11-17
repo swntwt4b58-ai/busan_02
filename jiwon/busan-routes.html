@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>부산 구별 여행 경로</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: 조건 패널(위) → 구 선택 레일 → 지하철 노선도처럼 그린 일자별 경로 → 전체 구 비교표 → 데이터 메모 */
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --ink:#15232b; --muted:#5b6b74; --line:#d5dde1;
+  --l1:#e8650a; /* 부산 1호선 */ --l2:#4f9a2c; /* 2호선 */ --l3:#a97c10; /* 3호선 */
+  --accent:#e8650a; --chip:#e9eef0; --warn:#a4470b; --warnbg:#fdf0e6;
+  --display:"Black Han Sans","IBM Plex Sans KR",system-ui,sans-serif;
+  --body:"IBM Plex Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f171b; --surface:#16222a; --ink:#e6ecef; --muted:#97a8b1; --line:#2a3a43;
+  --l1:#ff8a3d; --l2:#7cc457; --l3:#d6a73a; --accent:#ff8a3d; --chip:#1f2e36; --warn:#ffb27a; --warnbg:#2c1f15; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f171b; --surface:#16222a; --ink:#e6ecef; --muted:#97a8b1; --line:#2a3a43;
+  --l1:#ff8a3d; --l2:#7cc457; --l3:#d6a73a; --accent:#ff8a3d; --chip:#1f2e36; --warn:#ffb27a; --warnbg:#2c1f15; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--display);font-weight:400;letter-spacing:.01em;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.15}
+h2{font-size:22px}
+.lede{color:var(--muted);max-width:65ch;margin:6px 0 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.label{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:5px 13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+select{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.hint{font-size:12.5px;color:var(--muted)}
+.rail{display:flex;flex-wrap:wrap;gap:6px}
+.rail button{font:inherit;font-size:14px;border:none;background:var(--chip);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
+.rail button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.summary{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline}
+.summary .gu{font-family:var(--display);font-size:30px}
+.pill{font-size:12.5px;background:var(--chip);border-radius:999px;padding:2px 10px;color:var(--ink)}
+.days{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 16px 10px;min-width:0}
+.dayhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.badge{font-family:var(--mono);font-size:12px;color:#fff;border-radius:4px;padding:2px 8px}
+.dayhead b{font-size:16px}
+.dayhead span{color:var(--muted);font-size:13px}
+ol.line{list-style:none;margin:0;padding:0;position:relative}
+ol.line li{position:relative;padding:0 0 14px 44px;min-height:30px}
+ol.line li::before{content:"";position:absolute;left:15px;top:6px;bottom:-6px;width:4px;background:var(--c)}
+ol.line li:last-child::before{display:none}
+ol.line li .dot{position:absolute;left:8px;top:4px;width:18px;height:18px;border-radius:50%;background:var(--surface);border:4px solid var(--c)}
+ol.line li.meal .dot,ol.line li.cafe .dot,ol.line li.stay .dot{width:12px;height:12px;left:11px;top:7px;border-width:3px;background:var(--c)}
+.t{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.nm{font-weight:700}
+.nm a{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.kind{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--muted);margin-right:6px}
+.sub{font-size:13px;color:var(--muted)}
+.warn{font-size:12.5px;color:var(--warn);background:var(--warnbg);border-radius:5px;padding:1px 7px;display:inline-block;margin-top:3px}
+.tips{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.tips ul{margin:6px 0 0;padding-left:18px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:700}
+tr:last-child td{border-bottom:none}
+td button{font:inherit;font-weight:700;background:none;border:none;color:var(--accent);cursor:pointer;padding:0}
+.notes{color:var(--muted);font-size:13.5px;max-width:80ch}
+.notes li{margin-bottom:4px}
+@media (prefers-reduced-motion:no-preference){.day{animation:in .25s ease-out both}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>부산 구별 여행 경로</h1>
+    <p class="lede">인원, 기간, 동행 유형, 여행 월을 고르면 15개 구마다 관광지 Top 5(T map 검색 수요)와 별점 상위 맛집·카페로 짠 경로가 나옵니다. 1박 2일 이상은 고른 구에서 묵고 둘째·셋째 날에 이웃 구를 돕니다.</p>
+  </header>
+
+  <section class="panel" aria-label="여행 조건">
+    <div class="field"><span class="label">동행 유형</span><div class="seg" id="type"></div></div>
+    <div class="field"><span class="label">인원</span><div class="seg" id="ppl"></div><span class="hint" id="pplhint"></span></div>
+    <div class="field"><span class="label">기간</span><div class="seg" id="dur"></div></div>
+    <div class="field"><label class="label" for="month">여행 월</label><select id="month"></select><span class="hint">월별 검색 수요로 계절 순위를 조정합니다</span></div>
+  </section>
+
+  <section aria-label="구 선택" style="display:flex;flex-direction:column;gap:10px">
+    <span class="label">구 선택</span>
+    <div class="rail" id="rail"></div>
+  </section>
+
+  <section id="plan" style="display:flex;flex-direction:column;gap:16px"></section>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <h2>15개 구 한눈에 보기</h2>
+    <p class="hint" id="cmpcap"></p>
+    <div class="tablewrap"><table><thead><tr><th>구</th><th>1일차 경로</th><th>2·3일차 이웃 구</th><th>숙소 권역</th></tr></thead><tbody id="cmp"></tbody></table></div>
+  </section>
+
+  <section>
+    <h2 style="font-size:18px;margin-bottom:6px">데이터와 기준</h2>
+    <ul class="notes">
+      <li>관광지: 한국관광 데이터랩 인기관광지 현황, 구·군별 Top 5(2023.01~2026.10 T map 목적지 검색건수). 검색량은 방문 수요의 대리지표이며 실제 입장객 수가 아닙니다. "최근 12개월"은 2025.11~2026.10 합계입니다.</li>
+      <li>맛집·카페: 카카오맵 별점순(평가 50건 이상, 2026-11-17 조회). ⚠ 표시는 평가 20~49건으로 보충한 곳입니다.</li>
+      <li>경로에서 뺀 곳: 생활체육·업무 시설 성격이라 검증이 필요한 곳(가톨릭센터, 백운포체육공원, 강서체육공원, 사상구다누림센터, 스포원파크싸이드롬)과 최근 12개월 값이 없는 렛츠런파크, 동구문화플랫폼시민마당입니다. 기장군은 맛집·카페 자료가 없어 넣지 않았습니다.</li>
+      <li>동행 유형별 적합도, 방문 순서, 소요 시간, 이동 수단, 숙소 권역은 장소 성격과 위치를 보고 정한 추정값입니다. 출발 전에 지도 앱으로 이동 시간과 영업시간을 확인하세요.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const ATTR = {"부산민주공원": {"gu": "중구", "cat": "관광명소", "r12": 9728, "tot": 41947, "pub": 46, "idx": [0.89, 0.76, 0.88, 2.72, 0.99, 0.76, 0.68, 0.72, 0.86, 0.96, 0.93, 0.84]}, "용두산공원": {"gu": "중구", "cat": "관광명소", "r12": 5221, "tot": 22972, "pub": 46, "idx": [0.89, 0.87, 1.02, 1.01, 1.21, 0.89, 0.78, 0.91, 0.92, 1.36, 1.03, 1.09]}, "부산영화체험박물관": {"gu": "중구", "cat": "문화생활시설", "r12": 3829, "tot": 15490, "pub": 46, "idx": [1.2, 0.98, 0.68, 0.57, 1.04, 0.87, 1.11, 1.75, 0.83, 1.09, 0.75, 1.14]}, "가톨릭센터": {"gu": "중구", "cat": "문화생활시설", "r12": 4041, "tot": 14351, "pub": 46, "idx": [0.82, 0.83, 1.03, 0.94, 1.02, 0.92, 0.97, 0.86, 1.0, 1.29, 1.18, 1.15]}, "부산북항마리나": {"gu": "중구", "cat": "문화생활시설", "r12": 3162, "tot": 10006, "pub": 34, "idx": [0.59, 0.6, 0.81, 0.85, 0.93, 1.61, 1.09, 0.9, 1.15, 1.22, 1.11, 1.15]}, "송도해수욕장": {"gu": "서구", "cat": "관광명소", "r12": 43677, "tot": 169514, "pub": 44, "idx": [0.94, 0.88, 0.9, 0.81, 1.16, 0.84, 1.02, 1.37, 1.06, 1.23, 0.96, 0.83]}, "암남공원": {"gu": "서구", "cat": "관광명소", "r12": 12652, "tot": 72703, "pub": 46, "idx": [1.04, 1.04, 1.11, 0.88, 1.1, 0.92, 0.72, 0.77, 0.91, 1.27, 1.17, 1.07]}, "감천항동방파제": {"gu": "서구", "cat": "관광명소", "r12": 2821, "tot": 12623, "pub": 44, "idx": [0.61, 0.52, 0.57, 0.64, 0.97, 0.59, 0.67, 0.98, 2.08, 2.15, 1.38, 0.82]}, "내원정사": {"gu": "서구", "cat": "종교", "r12": 2512, "tot": 10909, "pub": 46, "idx": [0.92, 0.95, 0.82, 0.82, 1.73, 0.88, 0.79, 0.89, 1.12, 1.14, 1.06, 0.89]}, "부산중앙공원": {"gu": "서구", "cat": "관광명소", "r12": 1282, "tot": 6916, "pub": 45, "idx": [0.79, 0.87, 1.19, 1.74, 1.0, 0.89, 0.75, 0.89, 0.83, 0.93, 1.03, 1.1]}, "북항친수공원": {"gu": "동구", "cat": "관광명소", "r12": 25554, "tot": 55256, "pub": 46, "idx": [0.5, 0.49, 0.62, 0.58, 0.8, 0.78, 0.66, 0.67, 2.59, 2.76, 1.0, 0.56]}, "부산과학체험관": {"gu": "동구", "cat": "문화생활시설", "r12": 4514, "tot": 21190, "pub": 46, "idx": [1.12, 0.95, 0.78, 0.72, 0.98, 0.83, 1.16, 1.57, 0.9, 1.05, 0.9, 1.03]}, "차이나타운": {"gu": "동구", "cat": "놀거리", "r12": 0, "tot": 18536, "pub": 30, "idx": [0.95, 0.98, 0.95, 0.95, 1.34, 0.78, 0.91, 1.0, 0.9, 1.28, 0.92, 1.04]}, "수정산가족체육공원": {"gu": "동구", "cat": "관광명소", "r12": 1133, "tot": 5686, "pub": 44, "idx": [0.77, 0.73, 1.05, 0.99, 1.87, 1.0, 0.54, 0.5, 0.82, 1.47, 1.41, 0.85]}, "동구문화플랫폼시민마당": {"gu": "동구", "cat": "문화생활시설", "r12": 712, "tot": 4243, "pub": 44, "idx": [1.27, 0.9, 0.74, 0.45, 0.38, 1.74, 1.51, 1.92, 1.48, 0.45, 0.56, 0.59]}, "태종대": {"gu": "영도구", "cat": "관광명소", "r12": 37382, "tot": 203746, "pub": 46, "idx": [0.96, 0.98, 0.94, 0.83, 1.18, 1.24, 0.98, 1.01, 0.83, 1.29, 0.89, 0.86]}, "국립해양박물관": {"gu": "영도구", "cat": "문화생활시설", "r12": 42010, "tot": 180660, "pub": 46, "idx": [0.87, 0.86, 0.91, 0.77, 1.15, 0.93, 1.13, 1.56, 0.96, 1.22, 0.77, 0.87]}, "아르떼뮤지엄부산": {"gu": "영도구", "cat": "문화생활시설", "r12": 12228, "tot": 49932, "pub": 28, "idx": [0.83, 0.77, 0.63, 0.43, 0.79, 0.6, 1.34, 2.27, 0.91, 1.05, 0.87, 1.52]}, "피아크": {"gu": "영도구", "cat": "문화생활시설", "r12": 8698, "tot": 40594, "pub": 46, "idx": [0.86, 0.74, 0.76, 0.62, 1.11, 0.94, 1.32, 1.44, 0.99, 1.34, 0.83, 1.05]}, "태종대온천": {"gu": "영도구", "cat": "관광명소", "r12": 8845, "tot": 32880, "pub": 46, "idx": [1.4, 1.26, 1.09, 0.72, 0.91, 0.74, 0.78, 0.86, 0.81, 1.05, 1.03, 1.36]}, "부산시민공원": {"gu": "부산진구", "cat": "관광명소", "r12": 32304, "tot": 160711, "pub": 46, "idx": [0.69, 0.69, 1.02, 1.19, 1.54, 1.06, 0.64, 0.58, 0.96, 1.6, 1.24, 0.79]}, "부산어린이대공원": {"gu": "부산진구", "cat": "레저/스포츠", "r12": 23337, "tot": 117244, "pub": 46, "idx": [0.84, 0.84, 1.0, 0.94, 1.18, 0.95, 0.95, 0.94, 1.0, 1.21, 1.2, 0.94]}, "삼광사": {"gu": "부산진구", "cat": "종교", "r12": 14557, "tot": 58439, "pub": 46, "idx": [0.89, 0.72, 0.71, 1.15, 3.78, 0.57, 0.61, 0.65, 0.71, 0.8, 0.68, 0.73]}, "KT&G상상마당부산": {"gu": "부산진구", "cat": "문화생활시설", "r12": 8780, "tot": 43302, "pub": 46, "idx": [0.85, 0.78, 0.82, 0.73, 0.91, 1.09, 1.23, 1.29, 1.04, 1.01, 0.89, 1.36]}, "국립부산국악원": {"gu": "부산진구", "cat": "문화생활시설", "r12": 8789, "tot": 36325, "pub": 46, "idx": [0.93, 0.83, 0.99, 0.87, 0.98, 0.94, 0.93, 0.96, 1.05, 1.17, 1.2, 1.16]}, "사직야구장": {"gu": "동래구", "cat": "레저/스포츠", "r12": 41118, "tot": 197956, "pub": 46, "idx": [0.41, 0.39, 1.01, 1.32, 1.65, 1.56, 1.23, 1.58, 1.21, 0.67, 0.54, 0.43]}, "허심청": {"gu": "동래구", "cat": "관광명소", "r12": 38648, "tot": 150381, "pub": 46, "idx": [1.34, 1.13, 0.99, 0.78, 0.96, 0.84, 0.86, 0.92, 0.85, 1.08, 0.99, 1.26]}, "부산해양자연사박물관": {"gu": "동래구", "cat": "문화생활시설", "r12": 6398, "tot": 26362, "pub": 46, "idx": [1.15, 1.06, 0.89, 0.66, 0.86, 0.85, 1.2, 1.67, 1.07, 0.98, 0.77, 0.85]}, "충렬사": {"gu": "동래구", "cat": "관광명소", "r12": 5091, "tot": 20866, "pub": 46, "idx": [0.94, 0.93, 1.39, 0.92, 1.01, 0.98, 0.86, 0.72, 0.93, 1.12, 1.34, 0.85]}, "복천박물관": {"gu": "동래구", "cat": "문화생활시설", "r12": 4685, "tot": 18812, "pub": 46, "idx": [0.82, 0.79, 0.91, 1.06, 0.97, 0.87, 0.81, 0.93, 1.0, 1.97, 1.04, 0.84]}, "백운포체육공원": {"gu": "남구", "cat": "관광명소", "r12": 25529, "tot": 112306, "pub": 46, "idx": [0.93, 0.9, 1.07, 0.96, 1.05, 1.02, 0.9, 0.96, 1.1, 1.11, 1.07, 0.92]}, "이기대수변공원": {"gu": "남구", "cat": "관광명소", "r12": 11504, "tot": 64337, "pub": 46, "idx": [1.01, 0.98, 1.42, 0.99, 1.08, 0.9, 0.67, 0.82, 0.9, 1.29, 1.13, 0.81]}, "오륙도스카이워크": {"gu": "남구", "cat": "관광명소", "r12": 13159, "tot": 54441, "pub": 44, "idx": [0.96, 0.89, 1.93, 1.21, 1.26, 0.66, 0.56, 0.78, 0.81, 1.29, 0.84, 0.8]}, "드림씨어터": {"gu": "남구", "cat": "문화생활시설", "r12": 7875, "tot": 44119, "pub": 40, "idx": [0.94, 0.41, 0.73, 1.06, 0.87, 0.95, 1.37, 1.42, 0.77, 0.89, 1.24, 1.34]}, "UN기념공원": {"gu": "남구", "cat": "관광명소", "r12": 7411, "tot": 36243, "pub": 46, "idx": [0.76, 0.78, 1.2, 1.35, 0.95, 1.02, 0.79, 0.73, 0.8, 1.35, 1.4, 0.88]}, "화명생태공원": {"gu": "북구", "cat": "관광명소", "r12": 14073, "tot": 87223, "pub": 46, "idx": [0.65, 0.74, 1.28, 1.18, 1.11, 0.86, 0.54, 0.55, 0.96, 2.0, 1.38, 0.76]}, "부산북구문화빙상센터": {"gu": "북구", "cat": "레저/스포츠", "r12": 10415, "tot": 40306, "pub": 46, "idx": [1.32, 1.11, 0.89, 0.71, 0.76, 0.9, 0.99, 1.21, 0.87, 1.03, 1.07, 1.14]}, "화명수목원": {"gu": "북구", "cat": "레저/스포츠", "r12": 8240, "tot": 32049, "pub": 46, "idx": [0.44, 0.51, 0.98, 1.21, 1.31, 1.18, 0.69, 0.61, 0.78, 1.46, 2.27, 0.56]}, "석불사": {"gu": "북구", "cat": "종교", "r12": 4939, "tot": 10618, "pub": 46, "idx": [0.79, 1.03, 1.25, 1.22, 1.5, 1.13, 0.75, 0.82, 0.77, 1.12, 0.84, 0.77]}, "부산어촌민속관": {"gu": "북구", "cat": "문화생활시설", "r12": 2232, "tot": 10539, "pub": 46, "idx": [0.98, 0.96, 1.07, 0.8, 1.2, 0.93, 1.08, 1.29, 0.88, 1.0, 0.84, 0.98]}, "송정해수욕장": {"gu": "해운대구", "cat": "관광명소", "r12": 93247, "tot": 419411, "pub": 46, "idx": [0.93, 0.82, 0.89, 0.82, 1.04, 1.02, 1.27, 1.49, 0.99, 1.05, 0.85, 0.81]}, "해운대해수욕장": {"gu": "해운대구", "cat": "관광명소", "r12": 97644, "tot": 377452, "pub": 46, "idx": [0.97, 0.86, 0.78, 0.74, 1.23, 1.01, 1.24, 1.57, 0.87, 1.02, 0.74, 0.98]}, "영화의전당": {"gu": "해운대구", "cat": "문화생활시설", "r12": 31184, "tot": 109240, "pub": 46, "idx": [0.59, 0.62, 0.7, 0.58, 1.02, 0.9, 0.92, 1.08, 1.01, 1.42, 1.23, 1.94]}, "부산요트경기장": {"gu": "해운대구", "cat": "레저/스포츠", "r12": 14979, "tot": 102289, "pub": 46, "idx": [0.72, 0.79, 0.75, 0.87, 1.14, 1.02, 1.13, 1.46, 0.92, 1.23, 1.12, 0.85]}, "SEA LIFE 부산아쿠아리움": {"gu": "해운대구", "cat": "관광명소", "r12": 19772, "tot": 96634, "pub": 46, "idx": [1.06, 0.99, 0.86, 0.72, 1.15, 0.91, 1.21, 1.52, 0.81, 0.93, 0.73, 1.11]}, "다대포해수욕장": {"gu": "사하구", "cat": "관광명소", "r12": 54611, "tot": 239410, "pub": 46, "idx": [0.89, 0.77, 0.84, 0.77, 1.05, 1.02, 1.22, 1.49, 1.08, 1.16, 0.88, 0.82]}, "다대포해변공원": {"gu": "사하구", "cat": "관광명소", "r12": 9961, "tot": 99881, "pub": 39, "idx": [0.68, 0.59, 0.67, 0.73, 1.1, 1.17, 1.3, 1.69, 1.12, 1.42, 0.85, 0.67]}, "부산현대미술관": {"gu": "사하구", "cat": "문화생활시설", "r12": 9319, "tot": 50762, "pub": 46, "idx": [1.11, 1.13, 1.11, 0.77, 0.94, 0.84, 0.9, 1.27, 1.01, 1.45, 0.63, 0.85]}, "을숙도공원": {"gu": "사하구", "cat": "관광명소", "r12": 7136, "tot": 26985, "pub": 44, "idx": [0.74, 0.82, 1.24, 1.36, 1.44, 0.75, 0.52, 0.51, 0.87, 1.8, 1.2, 0.75]}, "을숙도피크닉광장": {"gu": "사하구", "cat": "관광명소", "r12": 2268, "tot": 11941, "pub": 46, "idx": [0.47, 0.55, 1.26, 1.63, 1.62, 1.12, 0.44, 0.52, 1.05, 1.8, 1.07, 0.48]}, "범어사": {"gu": "금정구", "cat": "종교", "r12": 38281, "tot": 142167, "pub": 46, "idx": [1.05, 0.88, 0.9, 0.84, 1.18, 0.79, 0.73, 0.86, 0.99, 1.34, 1.59, 0.86]}, "스포원파크": {"gu": "금정구", "cat": "관광명소", "r12": 30624, "tot": 134409, "pub": 46, "idx": [0.74, 0.76, 1.16, 1.21, 1.21, 1.06, 0.75, 0.75, 1.02, 1.37, 1.16, 0.81]}, "홍법사": {"gu": "금정구", "cat": "종교", "r12": 8241, "tot": 30157, "pub": 46, "idx": [1.09, 1.01, 0.75, 0.78, 1.68, 0.88, 0.79, 0.9, 1.19, 1.36, 0.86, 0.72]}, "회동저수지": {"gu": "금정구", "cat": "관광명소", "r12": 3527, "tot": 12606, "pub": 43, "idx": [0.7, 0.77, 1.16, 1.36, 1.32, 0.81, 0.78, 0.71, 0.94, 1.39, 1.38, 0.7]}, "스포원파크싸이드롬": {"gu": "금정구", "cat": "레저/스포츠", "r12": 1869, "tot": 8693, "pub": 46, "idx": [0.66, 0.8, 1.16, 1.09, 1.0, 0.97, 0.85, 0.86, 0.83, 1.8, 1.16, 0.82]}, "대저생태공원": {"gu": "강서구", "cat": "관광명소", "r12": 20501, "tot": 103087, "pub": 43, "idx": [0.38, 0.37, 1.43, 3.85, 0.61, 0.34, 0.35, 0.41, 0.89, 2.11, 0.81, 0.45]}, "강서체육공원": {"gu": "강서구", "cat": "관광명소", "r12": 22091, "tot": 88044, "pub": 44, "idx": [0.67, 0.73, 1.44, 1.11, 1.24, 0.95, 0.71, 0.7, 0.98, 1.48, 1.29, 0.72]}, "맥도생태공원": {"gu": "강서구", "cat": "관광명소", "r12": 7460, "tot": 40911, "pub": 46, "idx": [0.6, 0.63, 2.21, 2.23, 0.9, 0.69, 0.53, 0.5, 0.81, 1.31, 0.97, 0.62]}, "렛츠런파크부산경남": {"gu": "강서구", "cat": "레저/스포츠", "r12": 0, "tot": 29344, "pub": 14, "idx": [0.76, 0.82, 1.08, 1.23, 1.07, 1.07, 1.19, 0.98, 0.86, 1.13, 0.9, 0.92]}, "라라쥬동물원": {"gu": "강서구", "cat": "관광명소", "r12": 5532, "tot": 25019, "pub": 39, "idx": [1.41, 1.2, 0.98, 0.63, 1.02, 0.95, 1.05, 1.23, 0.77, 0.83, 0.78, 1.15]}, "황령산전망대": {"gu": "연제구", "cat": "관광명소", "r12": 20911, "tot": 76379, "pub": 46, "idx": [0.95, 0.81, 1.09, 1.18, 0.95, 0.83, 0.84, 1.09, 1.01, 1.25, 1.1, 0.9]}, "혜원정사": {"gu": "연제구", "cat": "종교", "r12": 3151, "tot": 12317, "pub": 46, "idx": [1.39, 1.18, 0.81, 0.67, 1.33, 0.68, 0.72, 0.71, 1.4, 1.36, 0.89, 0.87]}, "황령산": {"gu": "연제구", "cat": "관광명소", "r12": 2390, "tot": 7812, "pub": 32, "idx": [1.14, 0.92, 1.2, 1.21, 0.94, 0.71, 0.68, 0.92, 0.89, 1.16, 1.28, 0.95]}, "마하사": {"gu": "연제구", "cat": "종교", "r12": 1692, "tot": 6301, "pub": 46, "idx": [1.02, 0.87, 0.99, 1.07, 1.26, 0.92, 0.85, 0.85, 0.91, 1.13, 1.14, 0.99]}, "아이사랑뜰": {"gu": "연제구", "cat": "레저/스포츠", "r12": 734, "tot": 3245, "pub": 46, "idx": [1.62, 1.34, 0.9, 0.7, 0.63, 0.63, 1.26, 1.27, 0.87, 0.71, 0.95, 1.12]}, "광안리해수욕장": {"gu": "수영구", "cat": "관광명소", "r12": 104318, "tot": 429971, "pub": 46, "idx": [0.91, 0.86, 0.9, 0.83, 1.13, 0.97, 1.21, 1.42, 0.92, 1.05, 0.92, 0.88]}, "F1963": {"gu": "수영구", "cat": "문화생활시설", "r12": 8619, "tot": 38319, "pub": 46, "idx": [0.98, 0.81, 0.72, 0.68, 1.09, 0.87, 1.22, 1.55, 1.1, 1.22, 0.86, 0.89]}, "민락수변공원": {"gu": "수영구", "cat": "관광명소", "r12": 4966, "tot": 22022, "pub": 44, "idx": [1.01, 0.88, 0.98, 0.8, 1.11, 0.76, 0.87, 1.04, 1.12, 1.17, 1.24, 1.03]}, "도모헌": {"gu": "수영구", "cat": "문화생활시설", "r12": 4284, "tot": 15562, "pub": 26, "idx": [0.97, 1.07, 1.1, 0.93, 0.94, 0.79, 0.56, 0.7, 0.68, 1.59, 1.47, 1.2]}, "수영사적공원": {"gu": "수영구", "cat": "관광명소", "r12": 3160, "tot": 15532, "pub": 44, "idx": [1.05, 1.02, 1.41, 0.94, 1.17, 0.67, 0.61, 0.76, 1.03, 1.17, 1.15, 1.02]}, "삼락생태공원": {"gu": "사상구", "cat": "관광명소", "r12": 28454, "tot": 117555, "pub": 44, "idx": [0.61, 0.67, 1.5, 1.84, 1.19, 0.73, 0.52, 0.52, 0.93, 1.72, 1.14, 0.64]}, "사상구다누림센터": {"gu": "사상구", "cat": "문화생활시설", "r12": 4621, "tot": 21694, "pub": 46, "idx": [0.92, 1.03, 1.06, 0.88, 0.86, 0.89, 0.92, 0.93, 1.07, 1.17, 1.24, 1.04]}, "운수사": {"gu": "사상구", "cat": "종교", "r12": 4382, "tot": 14798, "pub": 46, "idx": [0.81, 0.76, 0.79, 0.87, 1.37, 0.82, 0.77, 0.82, 1.33, 1.7, 1.17, 0.78]}, "사상근린공원": {"gu": "사상구", "cat": "관광명소", "r12": 3080, "tot": 13890, "pub": 46, "idx": [0.58, 0.83, 1.3, 1.35, 1.55, 1.2, 0.49, 0.36, 0.82, 1.8, 1.15, 0.56]}, "삼락생태공원인라인스케이트장1트랙": {"gu": "사상구", "cat": "레저/스포츠", "r12": 1576, "tot": 7690, "pub": 46, "idx": [0.58, 0.78, 1.5, 1.53, 1.19, 0.89, 0.51, 0.61, 0.91, 1.64, 1.16, 0.71]}, "해동용궁사": {"gu": "기장군", "cat": "종교", "r12": 94766, "tot": 436998, "pub": 46, "idx": [1.24, 1.09, 1.0, 0.83, 1.15, 0.85, 0.78, 1.05, 0.77, 1.25, 0.96, 1.02]}, "롯데월드 어드벤처 부산": {"gu": "기장군", "cat": "레저/스포츠", "r12": 35290, "tot": 175323, "pub": 46, "idx": [0.67, 0.94, 0.86, 1.03, 1.57, 0.9, 0.6, 0.75, 0.9, 1.75, 1.13, 0.92]}, "국립부산과학관": {"gu": "기장군", "cat": "문화생활시설", "r12": 33913, "tot": 126638, "pub": 44, "idx": [1.24, 1.23, 0.96, 0.7, 1.05, 0.73, 0.94, 1.36, 0.95, 1.1, 0.8, 0.94]}, "일광해수욕장": {"gu": "기장군", "cat": "관광명소", "r12": 33874, "tot": 123414, "pub": 44, "idx": [0.96, 0.8, 0.87, 0.83, 1.26, 0.89, 1.15, 1.55, 1.02, 1.12, 0.83, 0.73]}, "장안사": {"gu": "기장군", "cat": "종교", "r12": 19422, "tot": 80038, "pub": 46, "idx": [0.83, 0.72, 0.89, 0.92, 1.2, 1.02, 0.94, 1.1, 0.88, 1.23, 1.49, 0.78]}};
+const FOOD = {"중구": {"food": [{"name": "켄짱 카레 남포2호점", "cat": "일식", "rating": 4.7, "reviews": 164, "addr": "부산 중구 광복로35번길 16-1 2층", "url": "https://place.map.kakao.com/110093653", "warn": false}, {"name": "홍가네양곱창", "cat": "곱창,막창", "rating": 4.7, "reviews": 108, "addr": "부산 중구 자갈치로59번길 5-13 1층", "url": "https://place.map.kakao.com/14635584", "warn": false}, {"name": "대박횟집 남포점", "cat": "회", "rating": 4.6, "reviews": 50, "addr": "부산 중구 보수대로24번길 7-1 1층", "url": "https://place.map.kakao.com/1356727008", "warn": false}, {"name": "이정태본참치", "cat": "참치회", "rating": 4.4, "reviews": 142, "addr": "부산 중구 중앙대로81번길 9 1층", "url": "https://place.map.kakao.com/21590983", "warn": false}, {"name": "돌쇠장작구이", "cat": "육류,고기", "rating": 4.3, "reviews": 87, "addr": "부산 중구 해관로 19-1 1층", "url": "https://place.map.kakao.com/11519013", "warn": false}], "cafe": [{"name": "바우노바커피", "cat": "커피전문점", "rating": 4.8, "reviews": 95, "addr": "부산 중구 광복로97번길 6 1층", "url": "https://place.map.kakao.com/19041969", "warn": false}, {"name": "레귤러하우스 남포점", "cat": "카페", "rating": 4.7, "reviews": 135, "addr": "부산 중구 중구로40번길 22 2층", "url": "https://place.map.kakao.com/663990938", "warn": false}, {"name": "바우노바 백산점", "cat": "커피전문점", "rating": 4.7, "reviews": 52, "addr": "부산 중구 백산길 9 2층", "url": "https://place.map.kakao.com/2071981011", "warn": false}]}, "서구": {"food": [{"name": "클램 하우스 부산송도본점", "cat": "조개", "rating": 4.8, "reviews": 127, "addr": "부산 서구 송도해변로 27 3층", "url": "https://place.map.kakao.com/1459557599", "warn": false}, {"name": "송도해솥", "cat": "한식", "rating": 4.7, "reviews": 147, "addr": "부산 서구 송도해변로 133 4층", "url": "https://place.map.kakao.com/1530236494", "warn": false}, {"name": "송도제일밀면", "cat": "국수", "rating": 4.5, "reviews": 100, "addr": "부산 서구 충무대로 8 기산비치타운 1층 105-2~105-3호", "url": "https://place.map.kakao.com/9147677", "warn": false}, {"name": "왕밀면냉면 본점", "cat": "분식", "rating": 4.5, "reviews": 75, "addr": "부산 서구 충무대로 122-1 프레스코빌딩 2층", "url": "https://place.map.kakao.com/15673901", "warn": false}, {"name": "브런치송도&디에이블", "cat": "이탈리안", "rating": 4.4, "reviews": 91, "addr": "부산 서구 충무대로34번길 47 3층 301호", "url": "https://place.map.kakao.com/510385750", "warn": false}], "cafe": [{"name": "오그남", "cat": "카페", "rating": 4.8, "reviews": 52, "addr": "부산 서구 송도해변로 143 1-3층", "url": "https://place.map.kakao.com/2033515786", "warn": false}, {"name": "EL16.52", "cat": "카페", "rating": 3.4, "reviews": 87, "addr": "부산 서구 암남공원로 177", "url": "https://place.map.kakao.com/416262418", "warn": false}, {"name": "유씨", "cat": "카페", "rating": 4.9, "reviews": 28, "addr": "부산 서구 망양로 191-1 1층", "url": "https://place.map.kakao.com/1859667116", "warn": true}]}, "동구": {"food": [{"name": "장만옥", "cat": "중식", "rating": 4.8, "reviews": 292, "addr": "부산 동구 대영로243번길 23 1층", "url": "https://place.map.kakao.com/1421297097", "warn": false}, {"name": "스모키그릴", "cat": "양식", "rating": 4.8, "reviews": 60, "addr": "부산 동구 중앙대로195번길 6 2층", "url": "https://place.map.kakao.com/1936658931", "warn": false}, {"name": "진역밀면", "cat": "국수", "rating": 4.7, "reviews": 55, "addr": "부산 동구 진성로9번길 12 1층", "url": "https://place.map.kakao.com/580362400", "warn": false}, {"name": "정짓간 부산역점", "cat": "국밥", "rating": 4.6, "reviews": 399, "addr": "부산 동구 중앙대로209번길 11 1층 대기실, 2층 매장", "url": "https://place.map.kakao.com/638476564", "warn": false}, {"name": "삼산면옥", "cat": "냉면", "rating": 4.4, "reviews": 136, "addr": "부산 동구 초량상로 76 1층", "url": "https://place.map.kakao.com/16581578", "warn": false}], "cafe": [{"name": "딥커피스트릿", "cat": "카페", "rating": 4.5, "reviews": 61, "addr": "부산 동구 중앙대로214번길 3-2 1층", "url": "https://place.map.kakao.com/1540042655", "warn": false}, {"name": "마루팥빙수단팥죽 본점", "cat": "디저트카페", "rating": 3.7, "reviews": 128, "addr": "부산 동구 중앙대로179번길 9 골드스톤 1,3층 101,301호", "url": "https://place.map.kakao.com/1758825361", "warn": false}, {"name": "네살차이", "cat": "디저트카페", "rating": 3.7, "reviews": 74, "addr": "부산 동구 중앙대로 447-1 1층", "url": "https://place.map.kakao.com/1001165624", "warn": false}]}, "영도구": {"food": [{"name": "작은시장횟집", "cat": "회", "rating": 4.8, "reviews": 91, "addr": "부산 영도구 작은시장1길 16", "url": "https://place.map.kakao.com/16400014", "warn": false}, {"name": "또시아", "cat": "중식", "rating": 4.6, "reviews": 196, "addr": "부산 영도구 절영로 6 1층", "url": "https://place.map.kakao.com/147026116", "warn": false}, {"name": "금영돼지국밥", "cat": "국밥", "rating": 4.5, "reviews": 98, "addr": "부산 영도구 와치로 213 1층", "url": "https://place.map.kakao.com/16720598", "warn": false}, {"name": "화목정따로국밥", "cat": "국밥", "rating": 4.4, "reviews": 71, "addr": "부산 영도구 태종로73번길 22 1층", "url": "https://place.map.kakao.com/16636351", "warn": false}, {"name": "가마솥돼지국밥", "cat": "국밥", "rating": 4.2, "reviews": 77, "addr": "부산 영도구 남항시장길 350 1층", "url": "https://place.map.kakao.com/15526776", "warn": false}], "cafe": [{"name": "커피미미", "cat": "커피전문점", "rating": 4.7, "reviews": 66, "addr": "부산 영도구 남항로 26-10", "url": "https://place.map.kakao.com/15957176", "warn": false}, {"name": "모모스 영도 로스터리&커피바", "cat": "커피전문점", "rating": 4.2, "reviews": 358, "addr": "부산 영도구 봉래나루로 160 1층", "url": "https://place.map.kakao.com/1815462061", "warn": false}, {"name": "카페385", "cat": "카페", "rating": 4.2, "reviews": 269, "addr": "부산 영도구 태종로 539", "url": "https://place.map.kakao.com/55207990", "warn": false}]}, "부산진구": {"food": [{"name": "후발대", "cat": "육류,고기", "rating": 4.9, "reviews": 1165, "addr": "부산 부산진구 부전로20번길 32-5 1층", "url": "https://place.map.kakao.com/12030410", "warn": false}, {"name": "흑쇠 서면본점", "cat": "육류,고기", "rating": 4.8, "reviews": 141, "addr": "부산 부산진구 서전로10번길 32-1 지하1층, 1층", "url": "https://place.map.kakao.com/1404103238", "warn": false}, {"name": "프리윌피자", "cat": "피자", "rating": 4.6, "reviews": 124, "addr": "부산 부산진구 전포대로224번길 26 1층", "url": "https://place.map.kakao.com/34425017", "warn": false}, {"name": "버거샵 서면점", "cat": "햄버거", "rating": 4.5, "reviews": 169, "addr": "부산 부산진구 동천로108번길 11 창원빌딩 1층 106호", "url": "https://place.map.kakao.com/1648529818", "warn": false}, {"name": "급행장 본점", "cat": "갈비", "rating": 4.5, "reviews": 99, "addr": "부산 부산진구 서면문화로 4 1-3층", "url": "https://place.map.kakao.com/12601510", "warn": false}], "cafe": [{"name": "오늘도케이크 레터링케이크", "cat": "디저트카페", "rating": 5.0, "reviews": 326, "addr": "부산 부산진구 서전로37번길 14 1층 111호", "url": "https://place.map.kakao.com/1378380426", "warn": false}, {"name": "피켄드", "cat": "카페", "rating": 4.8, "reviews": 82, "addr": "부산 부산진구 전포대로 188 1층", "url": "https://place.map.kakao.com/1937214867", "warn": false}, {"name": "프랭클린 커피로스터스", "cat": "커피전문점", "rating": 4.7, "reviews": 200, "addr": "부산 부산진구 동성로 29 1층 2호", "url": "https://place.map.kakao.com/1288617122", "warn": false}]}, "동래구": {"food": [{"name": "육밀도 동래직영점", "cat": "육류,고기", "rating": 4.8, "reviews": 118, "addr": "부산 동래구 충렬대로 207 1층", "url": "https://place.map.kakao.com/133019556", "warn": false}, {"name": "요코", "cat": "일식집", "rating": 4.7, "reviews": 509, "addr": "부산 동래구 명륜로139번길 17 1층", "url": "https://place.map.kakao.com/596401302", "warn": false}, {"name": "당미옥한우곰탕 온천본점", "cat": "곰탕", "rating": 4.6, "reviews": 124, "addr": "부산 동래구 온천장로119번길 28 1층", "url": "https://place.map.kakao.com/1789810603", "warn": false}, {"name": "충렬함박", "cat": "양식", "rating": 4.6, "reviews": 75, "addr": "부산 동래구 반송로 214-1 1층", "url": "https://place.map.kakao.com/420348546", "warn": false}, {"name": "강초밥", "cat": "초밥,롤", "rating": 4.5, "reviews": 63, "addr": "부산 동래구 온천천로471번가길 12-2 1층", "url": "https://place.map.kakao.com/499331443", "warn": false}], "cafe": [{"name": "레이지모먼트커피스탠드", "cat": "커피전문점", "rating": 4.8, "reviews": 117, "addr": "부산 동래구 온천천로285번길 19 지전빌딩 2층", "url": "https://place.map.kakao.com/963219463", "warn": false}, {"name": "수안커피컴퍼니 커피하우스", "cat": "커피전문점", "rating": 3.5, "reviews": 88, "addr": "부산 동래구 충렬대로256번길 32", "url": "https://place.map.kakao.com/988686782", "warn": false}, {"name": "얼룩개", "cat": "커피전문점", "rating": 4.9, "reviews": 35, "addr": "부산 동래구 충렬대로272번길 15 2층 202호", "url": "https://place.map.kakao.com/166284486", "warn": true}]}, "남구": {"food": [{"name": "라이옥 본점", "cat": "베트남음식", "rating": 4.5, "reviews": 125, "addr": "부산 남구 용소로7번길 76 1층", "url": "https://place.map.kakao.com/27572026", "warn": false}, {"name": "대연밀면", "cat": "국수", "rating": 4.5, "reviews": 94, "addr": "부산 남구 천제등로 55 1층", "url": "https://place.map.kakao.com/16697877", "warn": false}, {"name": "텐짱 본점", "cat": "일식", "rating": 4.5, "reviews": 62, "addr": "부산 남구 수영로298번길 14 1층", "url": "https://place.map.kakao.com/1623867467", "warn": false}, {"name": "유일한식탁", "cat": "돈까스,우동", "rating": 4.4, "reviews": 107, "addr": "부산 남구 용소로13번길 62 아침햇살 102동 상가 1층", "url": "https://place.map.kakao.com/1961977405", "warn": false}, {"name": "부산약콩밀면", "cat": "한식", "rating": 4.4, "reviews": 67, "addr": "부산 남구 동명로145번길 80 1층", "url": "https://place.map.kakao.com/1171769326", "warn": false}], "cafe": [{"name": "폴바셋 부산대연DT점", "cat": "커피전문점", "rating": 4.6, "reviews": 39, "addr": "부산 남구 조각공원로 38 1-2층", "url": "https://place.map.kakao.com/1366003065", "warn": true}, {"name": "엄마손팥집", "cat": "디저트카페", "rating": 4.6, "reviews": 33, "addr": "부산 남구 유엔평화로 43 1층", "url": "https://place.map.kakao.com/16216072", "warn": true}, {"name": "카페미도리", "cat": "커피전문점", "rating": 4.6, "reviews": 22, "addr": "부산 남구 천제등로37번길 4 1층", "url": "https://place.map.kakao.com/1585859647", "warn": true}]}, "북구": {"food": [{"name": "감포횟집", "cat": "회", "rating": 4.8, "reviews": 143, "addr": "부산 북구 금곡대로8번길 11 1층", "url": "https://place.map.kakao.com/27485765", "warn": false}, {"name": "취밍", "cat": "중국요리", "rating": 4.5, "reviews": 79, "addr": "부산 북구 금곡대로285번길 16 메인프라자 1층 106호", "url": "https://place.map.kakao.com/17546222", "warn": false}, {"name": "금용", "cat": "중국요리", "rating": 4.1, "reviews": 158, "addr": "부산 북구 구포만세길 75 1층", "url": "https://place.map.kakao.com/8792300", "warn": false}, {"name": "연화리해녀집", "cat": "해물,생선", "rating": 4.1, "reviews": 134, "addr": "부산 북구 용당로20번길 24", "url": "https://place.map.kakao.com/440460374", "warn": false}, {"name": "신라농원", "cat": "육류,고기", "rating": 3.8, "reviews": 56, "addr": "부산 북구 기찰로 7 1-2층", "url": "https://place.map.kakao.com/7975461", "warn": false}], "cafe": [{"name": "카엘리움", "cat": "디저트카페", "rating": 4.2, "reviews": 146, "addr": "부산 북구 중리로 97 4층", "url": "https://place.map.kakao.com/864159092", "warn": false}, {"name": "스타벅스 화명강변DT점", "cat": "커피전문점", "rating": 3.8, "reviews": 56, "addr": "부산 북구 금곡대로 77", "url": "https://place.map.kakao.com/1323414903", "warn": false}, {"name": "카페 비밀", "cat": "디저트카페", "rating": 4.6, "reviews": 40, "addr": "부산 북구 백양대로1015번길 14-7 1층", "url": "https://place.map.kakao.com/1617612165", "warn": true}]}, "해운대구": {"food": [{"name": "소촌갈비찜 해운대해리단길점", "cat": "갈비", "rating": 4.9, "reviews": 1013, "addr": "부산 해운대구 우동1로20번길 29 2층", "url": "https://place.map.kakao.com/1957972963", "warn": false}, {"name": "한어부의고등어사랑", "cat": "해물,생선", "rating": 4.6, "reviews": 125, "addr": "부산 해운대구 해운대로594번길 5 2층", "url": "https://place.map.kakao.com/834374979", "warn": false}, {"name": "김해김가네뒷고기", "cat": "육류,고기", "rating": 4.5, "reviews": 58, "addr": "부산 해운대구 중동1로17번길 9", "url": "https://place.map.kakao.com/27420250", "warn": false}, {"name": "거대곰탕 해운대점", "cat": "곰탕", "rating": 4.4, "reviews": 305, "addr": "부산 해운대구 해운대해변로 163 상가동 101호, 102호", "url": "https://place.map.kakao.com/1211020458", "warn": false}, {"name": "거대숯불구이", "cat": "육류,고기", "rating": 4.3, "reviews": 52, "addr": "부산 해운대구 좌동순환로 459 1층", "url": "https://place.map.kakao.com/27323732", "warn": false}], "cafe": [{"name": "은쏨", "cat": "카페", "rating": 4.9, "reviews": 69, "addr": "부산 해운대구 우동1로38번길 2 1층", "url": "https://place.map.kakao.com/1870791005", "warn": false}, {"name": "오엘스 에스프레소바", "cat": "카페", "rating": 4.8, "reviews": 88, "addr": "부산 해운대구 달맞이길117번나길 55 A동 101호", "url": "https://place.map.kakao.com/34737656", "warn": false}, {"name": "제스터", "cat": "카페", "rating": 4.7, "reviews": 51, "addr": "부산 해운대구 우동1로38번가길 7-5 1층", "url": "https://place.map.kakao.com/1160398628", "warn": false}]}, "사하구": {"food": [{"name": "노적봉 하단점", "cat": "육류,고기", "rating": 5.0, "reviews": 938, "addr": "부산 사하구 낙동남로 1366-3 1층", "url": "https://place.map.kakao.com/1387086423", "warn": false}, {"name": "백스시", "cat": "초밥,롤", "rating": 5.0, "reviews": 116, "addr": "부산 사하구 하신중앙로335번길 13 1층", "url": "https://place.map.kakao.com/185077851", "warn": false}, {"name": "신세화", "cat": "한식", "rating": 5.0, "reviews": 62, "addr": "부산 사하구 낙동대로233번길 21-9 1층", "url": "https://place.map.kakao.com/24959588", "warn": false}, {"name": "육간명가", "cat": "육류,고기", "rating": 4.9, "reviews": 196, "addr": "부산 사하구 하신중앙로 270 2층", "url": "https://place.map.kakao.com/1183942993", "warn": false}, {"name": "정짓간 신평본점", "cat": "국밥", "rating": 4.7, "reviews": 294, "addr": "부산 사하구 비봉로 6 1층", "url": "https://place.map.kakao.com/1372738122", "warn": false}], "cafe": [{"name": "블랙업커피 을숙도점", "cat": "커피전문점", "rating": 4.0, "reviews": 61, "addr": "부산 사하구 낙동남로1233번길 30", "url": "https://place.map.kakao.com/97696204", "warn": false}, {"name": "카페만디", "cat": "카페", "rating": 3.7, "reviews": 115, "addr": "부산 사하구 오작로 104-7 1-2층", "url": "https://place.map.kakao.com/1484394628", "warn": false}, {"name": "스타벅스 사하장림DT점", "cat": "커피전문점", "rating": 4.8, "reviews": 21, "addr": "부산 사하구 을숙도대로 682", "url": "https://place.map.kakao.com/170675237", "warn": true}]}, "금정구": {"food": [{"name": "돈까스겸", "cat": "돈까스,우동", "rating": 4.6, "reviews": 63, "addr": "부산 금정구 부산대학로63번길 48 도노48빌딩 1층", "url": "https://place.map.kakao.com/15597283", "warn": false}, {"name": "금죽헌 금정산성점", "cat": "불고기,두루치기", "rating": 4.6, "reviews": 58, "addr": "부산 금정구 산성로 531 1층", "url": "https://place.map.kakao.com/1229339566", "warn": false}, {"name": "포포포 부산대본점", "cat": "베트남음식", "rating": 4.5, "reviews": 68, "addr": "부산 금정구 금강로 264 1층", "url": "https://place.map.kakao.com/1280247139", "warn": false}, {"name": "가야공원돼지국밥 부산대점", "cat": "국밥", "rating": 4.5, "reviews": 68, "addr": "부산 금정구 장전온천천로 87 1층", "url": "https://place.map.kakao.com/20057605", "warn": false}, {"name": "설봉돼지국밥", "cat": "국밥", "rating": 4.5, "reviews": 62, "addr": "부산 금정구 수림로49번길 6 1층", "url": "https://place.map.kakao.com/26468224", "warn": false}], "cafe": [{"name": "셀라스", "cat": "커피전문점", "rating": 4.6, "reviews": 114, "addr": "부산 금정구 금샘로 538 1,2층", "url": "https://place.map.kakao.com/1276098557", "warn": false}, {"name": "서빙고", "cat": "디저트카페", "rating": 4.6, "reviews": 60, "addr": "부산 금정구 장전로12번길 9 1층", "url": "https://place.map.kakao.com/26617796", "warn": false}, {"name": "모모스커피 부산본점", "cat": "커피전문점", "rating": 4.3, "reviews": 486, "addr": "부산 금정구 오시게로 20 1층", "url": "https://place.map.kakao.com/27259030", "warn": false}]}, "강서구": {"food": [{"name": "일백풍천민물장어 명지직영점", "cat": "장어", "rating": 4.9, "reviews": 72, "addr": "부산 강서구 르노삼성대로 638-10 2층", "url": "https://place.map.kakao.com/666261281", "warn": false}, {"name": "까치솥 뚜껑닭도리 명지직영점", "cat": "한식", "rating": 4.8, "reviews": 53, "addr": "부산 강서구 명지국제8로10번길 46 플러스존1 111~113호", "url": "https://place.map.kakao.com/388568834", "warn": false}, {"name": "보배반점 명지점", "cat": "중국요리", "rating": 4.6, "reviews": 146, "addr": "부산 강서구 명지오션시티10로 140 1층", "url": "https://place.map.kakao.com/1878305648", "warn": false}, {"name": "풍원장집밥 명지점", "cat": "한식뷔페", "rating": 4.6, "reviews": 70, "addr": "부산 강서구 명지국제6로 90 오션퍼스트 1층", "url": "https://place.map.kakao.com/885346807", "warn": false}, {"name": "영진돼지국밥", "cat": "국밥", "rating": 4.3, "reviews": 127, "addr": "부산 강서구 명지오션시티8로 31 1층", "url": "https://place.map.kakao.com/14547179", "warn": false}], "cafe": [{"name": "오플로우", "cat": "카페", "rating": 4.4, "reviews": 93, "addr": "부산 강서구 가락대로 1206", "url": "https://place.map.kakao.com/951210066", "warn": false}, {"name": "카페진목", "cat": "카페", "rating": 4.3, "reviews": 91, "addr": "부산 강서구 명지새동네길2번길 56-3 1층", "url": "https://place.map.kakao.com/966226515", "warn": false}, {"name": "그랜드하브", "cat": "카페", "rating": 4.0, "reviews": 71, "addr": "부산 강서구 가덕해안로 924", "url": "https://place.map.kakao.com/1134324141", "warn": false}]}, "연제구": {"food": [{"name": "맛고 본점", "cat": "육류,고기", "rating": 4.9, "reviews": 133, "addr": "부산 연제구 고분로13번길 9 1층", "url": "https://place.map.kakao.com/587665582", "warn": false}, {"name": "보배반점 부산시청점", "cat": "중국요리", "rating": 4.6, "reviews": 159, "addr": "부산 연제구 시청로 20 2층", "url": "https://place.map.kakao.com/1277612553", "warn": false}, {"name": "수복돼지국밥 연산점", "cat": "국밥", "rating": 4.6, "reviews": 87, "addr": "부산 연제구 고분로 41-1 2층", "url": "https://place.map.kakao.com/8457808", "warn": false}, {"name": "서가원국수", "cat": "국수", "rating": 4.4, "reviews": 85, "addr": "부산 연제구 반송로 68 D동 1층", "url": "https://place.map.kakao.com/1938923481", "warn": false}, {"name": "고등어다찌 연산동본점", "cat": "회", "rating": 4.4, "reviews": 50, "addr": "부산 연제구 고분로31번길 42 1-2층", "url": "https://place.map.kakao.com/12743016", "warn": false}], "cafe": [{"name": "소람", "cat": "카페", "rating": 4.9, "reviews": 50, "addr": "부산 연제구 중앙천로19번길 44 1층", "url": "https://place.map.kakao.com/926976756", "warn": false}, {"name": "사이먼커피", "cat": "커피전문점", "rating": 4.3, "reviews": 81, "addr": "부산 연제구 중앙대로1056번길 2 1층", "url": "https://place.map.kakao.com/1291556690", "warn": false}, {"name": "스미다 티하우스", "cat": "카페", "rating": 4.8, "reviews": 21, "addr": "부산 연제구 과정로278번길 47-11 1층", "url": "https://place.map.kakao.com/2118120874", "warn": true}]}, "수영구": {"food": [{"name": "대영횟집", "cat": "회", "rating": 4.8, "reviews": 195, "addr": "부산 수영구 광안해변로344번길 17-20", "url": "https://place.map.kakao.com/11002178", "warn": false}, {"name": "샤브남바완", "cat": "샤브샤브", "rating": 4.8, "reviews": 81, "addr": "부산 수영구 민락수변로 29 바다마루 1층 101~102호", "url": "https://place.map.kakao.com/846293253", "warn": false}, {"name": "살몬브라더스", "cat": "퓨전한식", "rating": 4.8, "reviews": 77, "addr": "부산 수영구 광안로 49 2층", "url": "https://place.map.kakao.com/1924325303", "warn": false}, {"name": "고옥", "cat": "일식집", "rating": 4.7, "reviews": 1039, "addr": "부산 수영구 광남로 6 1층", "url": "https://place.map.kakao.com/15206679", "warn": false}, {"name": "고마대구탕", "cat": "매운탕,해물탕", "rating": 4.7, "reviews": 278, "addr": "부산 수영구 광안해변로 127 1층", "url": "https://place.map.kakao.com/16221512", "warn": false}], "cafe": [{"name": "덕미 아틀리에 광안점", "cat": "디저트카페", "rating": 4.8, "reviews": 67, "addr": "부산 수영구 광남로172번길 25 1층", "url": "https://place.map.kakao.com/1846352011", "warn": false}, {"name": "브런치식당 소보", "cat": "카페", "rating": 4.7, "reviews": 122, "addr": "부산 수영구 민락로6번길 46-4 1층", "url": "https://place.map.kakao.com/1039626229", "warn": false}, {"name": "히떼로스터리 광안점", "cat": "카페", "rating": 4.7, "reviews": 60, "addr": "부산 수영구 수영로510번길 57 2층", "url": "https://place.map.kakao.com/747353131", "warn": false}]}, "사상구": {"food": [{"name": "보배반점 사상점", "cat": "중국요리", "rating": 4.8, "reviews": 176, "addr": "부산 사상구 사상로 171 1층", "url": "https://place.map.kakao.com/1599351370", "warn": false}, {"name": "해물왕창칼국수", "cat": "칼국수", "rating": 4.5, "reviews": 71, "addr": "부산 사상구 사상로 316 1층", "url": "https://place.map.kakao.com/26854866", "warn": false}, {"name": "만만주", "cat": "중식", "rating": 4.3, "reviews": 145, "addr": "부산 사상구 사상로212번길 17 1층", "url": "https://place.map.kakao.com/1073820564", "warn": false}, {"name": "동백꽃초밥", "cat": "초밥,롤", "rating": 4.3, "reviews": 51, "addr": "부산 사상구 사상로 232 1층", "url": "https://place.map.kakao.com/575569161", "warn": false}, {"name": "할매재첩국", "cat": "한식", "rating": 4.2, "reviews": 97, "addr": "부산 사상구 낙동대로1530번길 20-15 1층", "url": "https://place.map.kakao.com/1531629877", "warn": false}], "cafe": [{"name": "찐심버블티", "cat": "카페", "rating": 5.0, "reviews": 58, "addr": "부산 사상구 사상로319번길 7 1층", "url": "https://place.map.kakao.com/1831814519", "warn": false}, {"name": "에그머니나", "cat": "디저트카페", "rating": 4.5, "reviews": 76, "addr": "부산 사상구 광장로86번길 6 1층", "url": "https://place.map.kakao.com/1168112656", "warn": false}, {"name": "쉽커피 사상점", "cat": "카페", "rating": 4.4, "reviews": 54, "addr": "부산 사상구 사상로 182 1층", "url": "https://place.map.kakao.com/84762179", "warn": false}]}};
+
+const GUS = ["중구","서구","동구","영도구","부산진구","동래구","남구","북구","해운대구","사하구","금정구","강서구","연제구","수영구","사상구"];
+const TYPES = [["s","혼자"],["f","친구"],["fa","가족"],["c","연인"],["o","노약자 동반"],["k","아이 동반"]];
+const DURS = [[1,"당일"],[2,"1박 2일"],[3,"2박 3일"]];
+
+/* 장소 메타 (추정): fit = 유형별 적합도 2 추천 / 1 가능, ord = 구 안 동선 순서, h = 체류 시간, night = 야간 방문 적합, steep = 경사·계단 많음, in = 실내 */
+const META = {
+ "부산민주공원":{fit:{s:2,f:1,fa:1,c:1,o:2,k:1},ord:2,h:1,in:1,d:"민주항쟁기념관과 중앙공원 전망"},
+ "용두산공원":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:3,h:1.5,night:1,d:"부산타워 전망대, 광복로에서 에스컬레이터로 오름"},
+ "부산영화체험박물관":{fit:{s:1,f:2,fa:2,c:2,o:1,k:2},ord:4,h:1.5,in:1,d:"영화 촬영·특수효과 체험형 박물관"},
+ "부산북항마리나":{fit:{s:1,f:2,fa:1,c:2},ord:5,h:1,d:"북항 바닷가 산책과 요트 시설"},
+ "송도해수욕장":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:1,h:2,night:1,d:"해상케이블카·구름산책로"},
+ "암남공원":{fit:{s:2,f:2,fa:1,c:2,o:1},ord:2,h:1.5,steep:1,d:"케이블카 하부역, 해안 산책로(계단 구간 있음)"},
+ "감천항동방파제":{fit:{s:2,f:2},ord:3,h:1.5,d:"낚시 포인트"},
+ "내원정사":{fit:{s:2,c:1,o:2,fa:1},ord:5,h:1,d:"서대신동 도심 사찰"},
+ "부산중앙공원":{fit:{s:2,o:2,fa:1},ord:4,h:1,d:"충혼탑과 산책로"},
+ "북항친수공원":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:3,h:1.5,night:1,d:"부산역 앞 수변 잔디광장, 야경"},
+ "부산과학체험관":{fit:{fa:2,k:2,o:1},ord:4,h:2,in:1,d:"어린이 과학 체험 전시"},
+ "차이나타운":{fit:{s:2,f:2,fa:1,c:2,o:1},ord:2,h:1,d:"초량 상해거리 먹거리 골목"},
+ "수정산가족체육공원":{fit:{fa:1,o:1,s:1},ord:1,h:1,d:"산복도로 위 숲 산책"},
+ "태종대":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:4,h:2,d:"순환 다누비열차로 걷는 구간을 줄일 수 있음"},
+ "국립해양박물관":{fit:{s:1,f:1,fa:2,c:1,o:2,k:2},ord:3,h:2,in:1,d:"무료 상설전시, 아이 체험관"},
+ "아르떼뮤지엄부산":{fit:{s:1,f:2,fa:2,c:2,k:2},ord:2,h:1.5,in:1,d:"미디어아트 전시(유료)"},
+ "피아크":{fit:{f:2,fa:2,c:2,o:2,s:1},ord:1,h:1,in:1,d:"바다 앞 대형 베이커리 카페 복합공간"},
+ "태종대온천":{fit:{s:2,fa:2,o:2,f:1},ord:5,h:1.5,in:1,d:"해수 온천, 겨울 수요가 가장 많음"},
+ "부산시민공원":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:2,h:1.5,d:"옛 미군기지 터 대형 공원"},
+ "부산어린이대공원":{fit:{fa:2,k:2,o:2,s:1},ord:1,h:2,d:"성지곡수원지 숲길, 동물원 '삼정더파크' 옆"},
+ "삼광사":{fit:{s:2,o:2,fa:1},ord:1.5,h:1,steep:1,d:"5월 연등 시즌에 수요가 몰림"},
+ "KT&G상상마당부산":{fit:{s:2,f:2,c:2},ord:3,h:1,in:1,d:"서면 전시·공연·디자인숍"},
+ "국립부산국악원":{fit:{s:1,c:2,o:2,fa:1},ord:4,h:1.5,in:1,d:"국악 공연(일정 확인 필요)"},
+ "사직야구장":{fit:{s:1,f:2,fa:2,c:2},ord:4,h:3,night:1,season:[3,4,5,6,7,8,9,10],d:"롯데 자이언츠 홈 경기(3~10월)"},
+ "허심청":{fit:{s:2,f:1,fa:2,o:2},ord:2,h:2,in:1,d:"동래온천 대형 온천장"},
+ "부산해양자연사박물관":{fit:{fa:2,k:2,o:1},ord:3,h:1.5,in:1,d:"해양 생물·화석 전시"},
+ "충렬사":{fit:{s:2,o:2,fa:1,k:1},ord:3.5,h:1,d:"임진왜란 충신 사당과 정원"},
+ "복천박물관":{fit:{s:2,o:1,fa:2,k:1},ord:1,h:1,in:1,d:"가야 고분군과 유물 전시"},
+ "이기대수변공원":{fit:{s:2,f:2,c:2},ord:3,h:2,steep:1,d:"해안 산책로(오르막·계단 많음)"},
+ "오륙도스카이워크":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:4,h:1,d:"바다 위 유리 전망대"},
+ "드림씨어터":{fit:{f:1,c:2,fa:1,s:1},ord:2,h:3,in:1,night:1,d:"뮤지컬 공연장(예매 필요)"},
+ "UN기념공원":{fit:{s:2,o:2,fa:2,k:1,c:1},ord:1,h:1,d:"세계 유일 UN군 묘지"},
+ "화명생태공원":{fit:{s:1,f:1,fa:2,c:2,o:2,k:2},ord:2,h:1.5,d:"낙동강변 자전거·잔디밭"},
+ "부산북구문화빙상센터":{fit:{f:2,fa:2,k:2},ord:3,h:1.5,in:1,d:"실내 아이스링크"},
+ "화명수목원":{fit:{s:2,fa:2,c:2,o:2,k:2},ord:1,h:1.5,d:"가을 단풍철 검색이 가장 많음"},
+ "석불사":{fit:{s:2,f:1},ord:4,h:1,steep:1,d:"금정산 절벽 마애불, 오르막길"},
+ "부산어촌민속관":{fit:{fa:2,k:2,o:1},ord:3.5,h:1,in:1,d:"낙동강 어촌 생활 전시"},
+ "송정해수욕장":{fit:{s:2,f:2,c:2,fa:1,o:1},ord:5,h:1.5,d:"서핑 해변, 해운대보다 한적"},
+ "해운대해수욕장":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:3,h:1.5,night:1,d:"해변 산책, 동백섬까지 이어 걷기"},
+ "영화의전당":{fit:{s:2,f:2,c:2,fa:1},ord:1,h:2,in:1,night:1,d:"영화 상영·전시, 야간 지붕 조명"},
+ "부산요트경기장":{fit:{f:2,c:2,fa:2},ord:2,h:1,d:"요트투어 출발지(예약 필요)"},
+ "SEA LIFE 부산아쿠아리움":{fit:{fa:2,k:2,c:2,f:1,o:1},ord:4,h:2,in:1,d:"해운대 해변 지하 아쿠아리움"},
+ "다대포해수욕장":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:4,h:2,night:1,d:"낙조 명소, 해변공원 갯벌 산책로"},
+ "부산현대미술관":{fit:{s:2,f:1,c:2,fa:2,k:1,o:1},ord:1,h:1.5,in:1,d:"을숙도 현대미술관(무료 상설)"},
+ "을숙도공원":{fit:{s:1,fa:2,o:2,k:2,c:1},ord:2,h:1,d:"철새 도래지 산책"},
+ "을숙도피크닉광장":{fit:{fa:2,k:2,f:1},ord:2.5,h:1,d:"잔디 피크닉장"},
+ "범어사":{fit:{s:2,c:1,o:1,fa:1},ord:1,h:1.5,d:"금정산 천년 고찰, 11월 검색이 가장 많음"},
+ "스포원파크":{fit:{fa:2,k:2,f:2},ord:3,h:2,d:"경륜장·물놀이장·체육시설"},
+ "홍법사":{fit:{s:2,o:2,fa:1},ord:4,h:1,d:"대형 좌불이 있는 사찰"},
+ "회동저수지":{fit:{s:2,c:2,o:1,f:1},ord:2,h:1.5,d:"수변 둘레길"},
+ "대저생태공원":{fit:{s:1,f:1,fa:2,c:2,o:2,k:2},ord:1,h:1.5,d:"봄 유채꽃·가을 핑크뮬리"},
+ "맥도생태공원":{fit:{s:1,fa:1,c:1,o:2,k:1},ord:2,h:1,d:"낙동강 연꽃·습지 산책"},
+ "라라쥬동물원":{fit:{fa:2,k:2},ord:3,h:1.5,in:1,d:"실내 체험형 동물원"},
+ "황령산전망대":{fit:{s:2,f:2,c:2,fa:1},ord:4,h:1,night:1,d:"부산 대표 야경, 차량·택시로 이동"},
+ "혜원정사":{fit:{s:2,o:2},ord:1,h:0.5,d:"도심 사찰"},
+ "황령산":{fit:{s:2,f:2},ord:3,h:2,steep:1,d:"능선 등산로"},
+ "마하사":{fit:{s:2},ord:2,h:1,steep:1,d:"황령산 자락 고찰, 오르막"},
+ "아이사랑뜰":{fit:{k:2,fa:1},ord:1.5,h:1,in:1,d:"영유아 실내 놀이 공간"},
+ "광안리해수욕장":{fit:{s:2,f:2,fa:2,c:2,o:2,k:2},ord:3,h:2,night:1,d:"광안대교 야경, 주말 드론쇼"},
+ "F1963":{fit:{s:2,f:2,c:2,fa:2,o:1},ord:1,h:1.5,in:1,d:"옛 와이어 공장 복합문화공간"},
+ "민락수변공원":{fit:{f:2,c:2,s:1},ord:4,h:1,night:1,d:"바다 앞 계단 광장, 야경"},
+ "도모헌":{fit:{s:2,c:2,o:2},ord:2.5,h:1,in:1,d:"남천동 옛 관사 문화공간"},
+ "수영사적공원":{fit:{s:2,o:2,fa:1,k:1},ord:2,h:0.5,d:"좌수영 성지와 푸조나무"},
+ "삼락생태공원":{fit:{s:1,f:2,fa:2,c:2,o:2,k:2},ord:2,h:1.5,d:"낙동강 둔치 자전거·벚꽃길"},
+ "운수사":{fit:{s:2},ord:4,h:1,steep:1,d:"백양산 고찰, 오르막"},
+ "사상근린공원":{fit:{o:2,fa:1,k:1},ord:1,h:0.5,d:"도심 근린공원"},
+ "삼락생태공원인라인스케이트장1트랙":{fit:{k:2,f:1},ord:2.5,h:1,d:"인라인 트랙"},
+};
+
+const NEIGH = {"중구":["영도구","서구"],"서구":["중구","사하구"],"동구":["중구","부산진구"],"영도구":["중구","서구"],"부산진구":["동구","연제구"],"동래구":["금정구","연제구"],"남구":["수영구","해운대구"],"북구":["사상구","금정구"],"해운대구":["수영구","남구"],"사하구":["서구","강서구"],"금정구":["동래구","북구"],"강서구":["사하구","사상구"],"연제구":["동래구","수영구"],"수영구":["해운대구","남구"],"사상구":["북구","사하구"]};
+const STAY = {"중구":"남포동·광복동","서구":"송도해수욕장 앞","동구":"부산역 앞","영도구":"봉래동·남항동","부산진구":"서면","동래구":"동래온천장","남구":"대연동·경성대","북구":"화명동·덕천동","해운대구":"해운대해수욕장","사하구":"하단·다대포","금정구":"부산대·장전동","강서구":"명지국제신도시","연제구":"연산동·시청","수영구":"광안리해수욕장","사상구":"사상역 일대"};
+
+/* 음식 카테고리 → 유형 적합 (추정) */
+function foodFit(cat){
+  const has = re => re.test(cat);
+  const share = has(/고기|갈비|^회$|참치|곱창|중식|중국|조개|샤브|장어|해물|매운탕|피자|한식$/);
+  const solo  = has(/국밥|국수|냉면|일식$|돈까스|햄버거|곰탕|칼국수|분식|한식뷔페|초밥|일식집|베트남|양식|퓨전/);
+  const kid   = has(/돈까스|햄버거|피자|중식|중국|곰탕|양식|국수|이탈리안|한식뷔페|해물,생선|갈비|고기|일식$|초밥/);
+  const old   = has(/국밥|곰탕|한식|^회$|해물|칼국수|냉면|국수|장어|매운탕|중식|중국|갈비|초밥|일식집|참치/);
+  const date  = has(/양식|이탈리안|일식|초밥|베트남|피자|퓨전|샤브|^회$|고기|갈비|곱창|조개/);
+  return {share,solo,kid,old,date};
+}
+
+const $ = id => document.getElementById(id);
+const state = {type:"c", ppl:2, dur:1, month:new Date().getMonth()+1, gu:"수영구"};
+try{ const s = JSON.parse(localStorage.getItem("routeState")||"null"); if(s && GUS.includes(s.gu)) Object.assign(state,s); }catch(e){}
+
+function allowedPpl(t){ return t==="s"?[1]: t==="c"?[2]:[2,3,4]; }
+
+function spotsFor(gu, type, month){
+  const list=[];
+  for(const [name,a] of Object.entries(ATTR)){
+    if(a.gu!==gu) continue;
+    const m=META[name]; if(!m) continue;
+    const fit=m.fit[type]; if(!fit) continue;
+    if(type==="o" && m.steep) continue;
+    const off = m.season && !m.season.includes(month);
+    if(off) continue;
+    const idx=a.idx[month-1]||0;
+    let score = fit*2 + Math.log10(a.r12+50) + Math.min(idx,2)*1.2;
+    if((type==="o"||type==="k") && m.in && [12,1,2,7,8].includes(month)) score+=0.6;
+    list.push({name,a,m,score,idx});
+  }
+  return list.sort((x,y)=>y.score-x.score);
+}
+
+function pickFood(gu, kind, ctx, used, pref){
+  const list=(FOOD[gu]||{})[kind]||[];
+  const scored=list.filter(r=>!used.has(r.name)).map(r=>{
+    let s=r.rating + Math.log10(r.reviews)*0.15 - (r.warn?0.15:0);
+    if(kind==="food"){
+      const f=foodFit(r.cat);
+      if(ctx.ppl===1) s+= f.solo?0.6:-0.6;
+      if(ctx.ppl>=3) s+= f.share?0.5:0;
+      if(ctx.type==="k") s+= f.kid?0.6:-0.8;
+      if(ctx.type==="o") s+= f.old?0.6:-0.8;
+      if(ctx.type==="c") s+= f.date?0.4:0;
+      if(ctx.type==="f") s+= f.share?0.3:0;
+      if(pref==="dinner" && ctx.ppl>=2) s+= f.share?0.3:0;
+      if(pref==="lunch") s+= f.solo?0.2:0;
+    }else{
+      if(r.rating<4) s-=0.6;
+      if(ctx.type==="k"||ctx.type==="o") s+= /디저트/.test(r.cat)?0.3:0;
+    }
+    return {...r,s};
+  }).sort((a,b)=>b.s-a.s);
+  const r=scored[0]; if(r) used.add(r.name); return r;
+}
+
+const fmt = h => { const H=Math.floor(h), M=Math.round((h-H)*60); return String(H).padStart(2,"0")+":"+String(M).padStart(2,"0"); };
+
+function planDay(gu, ctx, used, dayNo, total){
+  const isFirst=dayNo===1, isLast=dayNo===total && total>1;
+  const spots=spotsFor(gu,ctx.type,ctx.month);
+  const light = ctx.type==="o" || ctx.type==="k";
+  let n = light?2:3; if(isLast) n=2;
+  const wantNight = !light && !isLast;
+  let night=null;
+  if(wantNight){ night=spots.find(s=>s.m.night); }
+  let day=spots.filter(s=>s!==night).slice(0, night? n-1 : n);
+  if(night && day.length+1<2) {/* 장소가 적으면 야간 장소도 낮 목록에 */}
+  day.sort((a,b)=>a.m.ord-b.m.ord);
+  const items=[]; let t = (isFirst && total>1)? 11 : 10;
+  if(ctx.type==="o") t+=0.5;
+  const move = ctx.ppl>=3||light ? "택시·자차 약 15~30분(추정)" : "지하철·버스 약 20~40분(추정)";
+  const pushSpot=(s,label)=>{
+    const warn=[];
+    if(s.m.steep) warn.push("계단·오르막 많음");
+    if(s.a.pub<40) warn.push(`46개월 중 ${s.a.pub}개월만 상위 30위 공개`);
+    if(!s.a.r12) warn.push("최근 12개월 상위 30위 밖");
+    items.push({kind:"spot",t:fmt(t),label,name:s.name,sub:`${s.m.d} · 약 ${s.m.h}시간`,
+      meta:`최근 12개월 검색 ${s.a.r12.toLocaleString()}건 · ${ctx.month}월 수요 지수 ${(s.idx||0).toFixed(2)}`,warn});
+    t+=s.m.h+0.4;
+  };
+  const pushFood=(kind,label,pref)=>{
+    const r=pickFood(gu,kind,ctx,used,pref); if(!r) return;
+    items.push({kind:kind==="food"?"meal":"cafe",t:fmt(t),label,name:r.name,url:r.url,
+      sub:`${r.cat} · ★${r.rating} (${r.reviews}) · ${r.addr.replace(/^부산 /,"")}`,warn:r.warn?["평가 50건 미만"]:[]});
+    t+= kind==="food"?1.1:0.8;
+  };
+  if(day[0]) pushSpot(day[0],"관광");
+  if(t<11.5) t=11.5;
+  pushFood("food","점심","lunch");
+  if(day[1]) pushSpot(day[1],"관광");
+  pushFood("cafe","카페");
+  if(day[2]) pushSpot(day[2],"관광");
+  if(!isLast){
+    t=Math.max(t, light?17.5:18);
+    pushFood("food","저녁","dinner");
+    if(night){ t=Math.max(t,19.5); pushSpot(night,"야간"); }
+    if(total>1) items.push({kind:"stay",t:fmt(Math.max(t,light?19.5:21.5)),label:"숙소",name:STAY[ctx.home]+" 권역",
+      sub: ctx.ppl===1?"게스트하우스·비즈니스호텔 1인실": ctx.ppl===2?"더블·트윈룸": ctx.ppl===3?"트리플·패밀리룸":"4인 패밀리룸·레지던스",
+      warn: dayNo>1 && gu!==ctx.home ? ["숙소로 돌아가는 이동 포함"]:[]});
+  } else {
+    items.push({kind:"stay",t:fmt(Math.max(t,15)),label:"귀가",name:"부산역·김해공항·사상터미널 방향으로 이동",sub:"출발 시각에 맞춰 마지막 일정 조정",warn:[]});
+  }
+  return {gu,items,move,spotCount:day.length+(night?1:0)};
+}
+
+function buildTrip(home, ctx){
+  const used=new Set();
+  const gus=[home, ...(NEIGH[home]||[])].slice(0,ctx.dur);
+  ctx={...ctx,home};
+  return gus.map((g,i)=>planDay(g,ctx,used,i+1,ctx.dur));
+}
+
+function tipsFor(ctx){
+  const t=[];
+  const tr = {1:"혼자라면 지하철·버스가 가장 쌉니다. 산 위 전망대처럼 대중교통이 불편한 곳만 택시를 쓰세요.",
+              2:"2명은 대중교통 위주로 다니고, 구 사이를 넘을 때 택시를 섞으면 시간이 절약됩니다.",
+              3:"3명이면 택시 요금을 나눠도 대중교통과 비슷해집니다. 택시 한 대로 이동하세요.",
+              4:"4명은 택시 한 대 정원이 꽉 찹니다. 짐이 있거나 2박 이상이면 렌터카가 편합니다."};
+  t.push(tr[ctx.ppl]);
+  if(ctx.ppl>=3) t.push("3~4명은 맛집 웨이팅이 길어지기 쉬우니 점심은 11:30 전, 저녁은 17:30 전에 들어가세요. 고기·회·중식처럼 나눠 먹는 메뉴를 우선 골랐습니다.");
+  if(ctx.ppl===1) t.push("1인 손님이 받기 쉬운 국밥·밀면·돈까스·일식 위주로 식당을 골랐습니다.");
+  const ty={s:"혼자: 하루 3곳과 야경 1곳. 사찰·전시처럼 혼자 둘러보기 좋은 곳에 가중치를 줬습니다.",
+            f:"친구: 하루 3곳과 야경 1곳. 체험·야경·나눠 먹는 메뉴를 우선했습니다.",
+            fa:"가족: 하루 3곳과 저녁 뒤 야경 1곳. 세대가 함께 걷기 무난한 곳을 우선했습니다.",
+            c:"연인: 하루 3곳과 야경 1곳. 전시·바다·야경 장소와 분위기 있는 식당을 우선했습니다.",
+            o:"노약자 동반: 하루 2곳으로 줄이고 계단·오르막이 많은 곳은 뺐습니다. 출발을 30분 늦추고 저녁을 일찍 마칩니다.",
+            k:"아이 동반: 하루 2곳, 체험·실내 장소 우선. 날 것·매운 메뉴는 순위를 낮췄습니다. 여름·겨울에는 실내 장소에 가중치를 더 줍니다."};
+  t.push(ty[ctx.type]);
+  if(ctx.dur>1) t.push("숙소 권역은 일반적인 숙박 밀집 지역 제안이며 숙소 데이터는 없습니다. 둘째 날부터는 이웃 구를 돌고 같은 숙소로 돌아오는 일정입니다.");
+  return t;
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function renderPlan(){
+  const ctx={type:state.type,ppl:state.ppl,dur:state.dur,month:state.month};
+  const trip=buildTrip(state.gu,ctx);
+  const tl=TYPES.find(x=>x[0]===ctx.type)[1], dl=DURS.find(x=>x[0]===ctx.dur)[1];
+  const colors=["var(--l1)","var(--l2)","var(--l3)"];
+  let h=`<div class="summary"><span class="gu">${state.gu}</span><span class="pill">${tl} · ${ctx.ppl}명</span><span class="pill">${dl}</span><span class="pill">${ctx.month}월</span>${ctx.dur>1?`<span class="pill">숙소 ${STAY[state.gu]}</span>`:""}</div><div class="days">`;
+  trip.forEach((d,i)=>{
+    h+=`<article class="day" style="--c:${colors[i]}"><div class="dayhead"><span class="badge" style="background:${colors[i]}">${i+1}일차</span><b>${d.gu}</b><span>${d.move}</span></div><ol class="line">`;
+    if(!d.spotCount) h+=`<li class="spot"><span class="dot"></span><span class="sub">이 조건에 맞는 Top 5 관광지가 없어 맛집·카페 위주로 짰습니다.</span></li>`;
+    d.items.forEach(it=>{
+      const nm = it.url? `<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.name)}</a>`: esc(it.name);
+      h+=`<li class="${it.kind}"><span class="dot"></span><div><span class="t">${it.t}</span> <span class="kind">${it.label}</span><span class="nm">${nm}</span></div><div class="sub">${esc(it.sub)}</div>${it.meta?`<div class="sub">${esc(it.meta)}</div>`:""}${it.warn.map(w=>`<span class="warn">${esc(w)}</span> `).join("")}</li>`;
+    });
+    h+=`</ol></article>`;
+  });
+  h+=`</div><div class="tips"><span class="label">이 조건에서 고려한 점</span><ul>${tipsFor(ctx).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  $("plan").innerHTML=h;
+}
+
+function renderCompare(){
+  const ctx={type:state.type,ppl:state.ppl,dur:state.dur,month:state.month};
+  const tl=TYPES.find(x=>x[0]===ctx.type)[1], dl=DURS.find(x=>x[0]===ctx.dur)[1];
+  $("cmpcap").textContent=`현재 조건: ${tl} · ${ctx.ppl}명 · ${dl} · ${ctx.month}월. 구 이름을 누르면 위에 자세한 경로가 열립니다.`;
+  $("cmp").innerHTML=GUS.map(g=>{
+    const d=buildTrip(g,ctx);
+    const chain=d[0].items.filter(i=>i.kind!=="stay").map(i=>esc(i.name)).join(" → ");
+    const rest=d.slice(1).map(x=>x.gu).join(", ")||"—";
+    return `<tr><td><button data-gu="${g}">${g}</button></td><td>${chain}</td><td>${rest}</td><td>${ctx.dur>1?STAY[g]:"—"}</td></tr>`;
+  }).join("");
+}
+
+function seg(el, opts, key, after){
+  el.innerHTML=opts.map(([v,l])=>`<button type="button" data-v="${v}">${l}</button>`).join("");
+  el.onclick=e=>{const b=e.target.closest("button"); if(!b||b.disabled) return; const v=b.dataset.v; state[key]=isNaN(+v)?v:+v; after&&after(); render();};
+}
+function syncControls(){
+  const ok=allowedPpl(state.type); if(!ok.includes(state.ppl)) state.ppl=ok[0];
+  document.querySelectorAll("#type button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===state.type));
+  document.querySelectorAll("#ppl button").forEach(b=>{b.disabled=!ok.includes(+b.dataset.v); b.setAttribute("aria-pressed",+b.dataset.v===state.ppl);});
+  document.querySelectorAll("#dur button").forEach(b=>b.setAttribute("aria-pressed",+b.dataset.v===state.dur));
+  document.querySelectorAll("#rail button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.gu===state.gu));
+  $("pplhint").textContent= state.type==="s"?"혼자는 1명으로 고정됩니다": state.type==="c"?"연인은 2명으로 고정됩니다":"2~4명 중에서 고르세요";
+  $("month").value=state.month;
+}
+function render(){ syncControls(); renderPlan(); renderCompare(); try{localStorage.setItem("routeState",JSON.stringify(state));}catch(e){} }
+
+seg($("type"),TYPES,"type");
+seg($("ppl"),[[1,"1명"],[2,"2명"],[3,"3명"],[4,"4명"]],"ppl");
+seg($("dur"),DURS,"dur");
+$("month").innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}월</option>`).join("");
+$("month").onchange=e=>{state.month=+e.target.value; render();};
+$("rail").innerHTML=GUS.map(g=>`<button type="button" data-gu="${g}">${g}</button>`).join("");
+$("rail").onclick=e=>{const b=e.target.closest("button"); if(b){state.gu=b.dataset.gu; render();}};
+$("cmp").onclick=e=>{const b=e.target.closest("button[data-gu]"); if(b){state.gu=b.dataset.gu; render(); $("plan").scrollIntoView({behavior:"smooth",block:"start"});}};
+render();
+</script>
+
+</body>
+</html>
